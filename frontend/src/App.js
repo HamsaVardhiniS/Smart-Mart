@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Route, Routes, Navigate, useNavigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import InventoryPage from "./pages/InventoryPage";
 import CashierPage from "./pages/CashierPage";
@@ -8,7 +8,6 @@ import BusinessHeadPage from "./pages/BusinessHeadPage";
 import AdminPage from "./pages/AdminPage";
 import "./App.css";
 
-// Matches database department names exactly
 const departmentRoutes = {
     "Human Resources": "/hr",
     "Business Development": "/business-head",
@@ -18,51 +17,64 @@ const departmentRoutes = {
 };
 
 function App() {
-    const [user, setUser] = useState(() => {
-        const storedUser = localStorage.getItem("user");
-        return storedUser ? JSON.parse(storedUser) : null;
-    });
-
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
     useEffect(() => {
-        if (user && !departmentRoutes[user.department]) {
-            handleLogout();
-        }
-    }, [user]);
+        const verifyAuth = async () => {
+            try {
+                const response = await fetch("http://localhost:5000/auth/verify-auth", {
+                    method: "GET",
+                    credentials: "include",
+                });
+
+                const data = await response.json();
+                if (data.success && data.employee) {
+                    setUser(data.employee);
+                    localStorage.setItem("user", JSON.stringify(data.employee));
+                } else {
+                    localStorage.removeItem("user");
+                    setUser(null);
+                }
+            } catch (error) {
+                console.error("Auth verification failed:", error);
+                localStorage.removeItem("user");
+                setUser(null);
+            }
+            setLoading(false);
+        };
+
+        verifyAuth();
+    }, []);
 
     const handleLogin = (employee) => {
         if (employee?.department && departmentRoutes[employee.department]) {
             setUser(employee);
             localStorage.setItem("user", JSON.stringify(employee));
-
             navigate(departmentRoutes[employee.department]);
         } else {
             console.error("Invalid department or missing department data.");
         }
     };
 
-    const handleLogout = async () => {
-        if (!user) return; // Prevent unnecessary API calls
-
-        try {
-            await fetch("http://localhost:5000/auth/logout", {
-                method: "POST",
-                credentials: "include",
-            });
-        } catch (error) {
-            console.error("Logout failed", error);
-        }
-
-        setUser(null);
-        localStorage.removeItem("user");
-        navigate("/login");
+    const handleLogout = () => {
+        fetch("http://localhost:5000/logout", { method: "POST", credentials: "include" })
+            .then(() => {
+                setUser(null);
+                localStorage.removeItem("user");
+                navigate("/login");
+            })
+            .catch((error) => console.error("Logout failed:", error));
     };
+
+    if (loading) {
+        return <div>Loading...</div>;
+    }
 
     return (
         <div className="App">
             <Routes>
-                {/* If no user, always go to login */}
                 {!user ? (
                     <>
                         <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
@@ -71,21 +83,15 @@ function App() {
                 ) : (
                     <>
                         <Route path="/" element={<Navigate replace to={departmentRoutes[user.department]} />} />
-                        <Route path="/inventory" element={user.department === "Inventory & Supply Chain Management" ? <InventoryPage /> : <Navigate to="/" />} />
-                        <Route path="/cashier" element={user.department === "Customer Billing" ? <CashierPage /> : <Navigate to="/" />} />
-                        <Route path="/hr" element={user.department === "Human Resources" ? <HRPage /> : <Navigate to="/" />} />
-                        <Route path="/business-head" element={user.department === "Business Development" ? <BusinessHeadPage /> : <Navigate to="/" />} />
-                        <Route path="/admin" element={user.department === "Admin" ? <AdminPage /> : <Navigate to="/" />} />
+                        <Route path="/inventory/*" element={<InventoryPage />} />
+                        <Route path="/cashier/*" element={<CashierPage />} />
+                        <Route path="/hr/*" element={<HRPage />} />
+                        <Route path="/business-head/*" element={<BusinessHeadPage />} />
+                        <Route path="/admin/*" element={<AdminPage />} />
                         <Route path="*" element={<Navigate to="/" />} />
                     </>
                 )}
             </Routes>
-
-            {user && (
-                <button className="logout-btn" onClick={handleLogout}>
-                    Logout
-                </button>
-            )}
         </div>
     );
 }

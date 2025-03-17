@@ -10,8 +10,8 @@ const generateInvoiceNumber = () => {
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
-        user: "your-email@gmail.com",  // Replace with your email
-        pass: "your-app-password"      // Use an app password, not your actual password
+        user: "your-email@gmail.com",
+        pass: "your-app-password"
     }
 });
 
@@ -65,27 +65,24 @@ exports.createBill = async (req, res) => {
 
     try {
         let customer_id;
-
-        // Check if the customer exists
         const [customer] = await db.promise().query(
             "SELECT customer_id FROM customers WHERE email = ?",
             [customer_email]
         );
 
         if (customer.length === 0) {
-            // Insert new customer if not found
             const [newCustomer] = await db.promise().query(
                 "INSERT INTO customers (email, registration_date) VALUES (?, NOW())",
                 [customer_email]
             );
-            customer_id = newCustomer.insertId; // Corrected assignment
+            customer_id = newCustomer.insertId;
         } else {
             customer_id = customer[0].customer_id;
         }
 
         const invoice_number = generateInvoiceNumber();
 
-        // Insert transaction (without total_amount initially)
+        // Insert transaction
         const [transaction] = await db.promise().query(
             "INSERT INTO sales_transactions (invoice_number, customer_id, payment_method, processed_by) VALUES (?, ?, ?, ?)",
             [invoice_number, customer_id, payment_method, processed_by]
@@ -96,7 +93,6 @@ exports.createBill = async (req, res) => {
         const itemQueries = [];
         const detailedItems = [];
 
-        // Prepare item insert queries and collect product details
         for (const item of items) {
             const { product_id, batch_id, quantity_sold, selling_price, discount } = item;
             const total_price = (quantity_sold * selling_price) - discount;
@@ -108,7 +104,6 @@ exports.createBill = async (req, res) => {
                 )
             );
 
-            // Fetch product name for email invoice
             const [productDetails] = await db.promise().query(
                 "SELECT product_name FROM products WHERE product_id = ?",
                 [product_id]
@@ -123,16 +118,14 @@ exports.createBill = async (req, res) => {
             totalAmount += total_price;
         }
 
-        // Execute all item insert queries in parallel
         await Promise.all(itemQueries);
 
-        // Update total amount in transaction
+        // Update total amount
         await db.promise().query(
             "UPDATE sales_transactions SET total_amount = ? WHERE transaction_id = ?",
             [totalAmount, transaction_id]
         );
 
-        // Send invoice email
         await sendInvoiceEmail(customer_email, invoice_number, detailedItems, totalAmount, payment_method);
 
         res.status(201).json({ message: "Bill created successfully and invoice sent!", invoice_number, transaction_id });

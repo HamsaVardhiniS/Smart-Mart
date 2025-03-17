@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import "../App.css";
+import "../App.css"; // Ensure you have styles
 
-// ✅ Matches database department names exactly
 const departmentRoutes = {
     "Human Resources": "/hr",
     "Business Development": "/business-head",
@@ -12,6 +11,7 @@ const departmentRoutes = {
 };
 
 const LoginPage = ({ onLogin }) => {
+    console.log("LoginPage Loaded");
     const [employee_id, setEmployeeId] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
@@ -19,65 +19,92 @@ const LoginPage = ({ onLogin }) => {
 
     const handleLogin = async (event) => {
         event.preventDefault();
-        setError(""); // Clear previous errors
-
+        setError("");
+    
         try {
-            console.log("Attempting login with Employee ID:", employee_id);
-            
             const response = await fetch("http://localhost:5000/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
                 body: JSON.stringify({ employee_id, password })
             });
-
+    
             const data = await response.json();
-            console.log("Login Response:", data);
-
+    
             if (response.ok && data.employee) {
                 onLogin(data.employee);
-                
                 const redirectPath = departmentRoutes[data.employee.department];
                 if (redirectPath) {
-                    console.log("Navigating to:", redirectPath);
                     navigate(redirectPath);
                 } else {
-                    console.error("Invalid department name received:", data.employee.department);
                     setError("Invalid department. Contact admin.");
                 }
             } else {
-                console.warn("Login failed:", data.error);
                 setError(data.error || "Login failed. Please try again.");
             }
         } catch (error) {
-            console.error("Server error:", error);
             setError("Server error. Please try again later.");
         }
     };
+    
+    // Ensure users are redirected to login if session is expired
+    useEffect(() => {
+        if (window.location.pathname === "/login") return; // Prevent redirect loop
+    
+        fetch("http://localhost:5000/auth/verify-auth", { credentials: "include" })
+            .then((res) => res.json())
+            .then((data) => {
+                if (data.success) {
+                    const redirectPath = departmentRoutes[data.employee.department] || "/dashboard";
+                    navigate(redirectPath);
+                }
+            })
+            .catch(() => console.log("Session expired or no active session."));
+    }, []);
 
     return (
-        <div className="login-container">
-            <div className="login-box">
-                <h2>Employee Login</h2>
-                {error && <p className="error-text">{error}</p>}
-                <form onSubmit={handleLogin}>
-                    <input
-                        type="number"
-                        placeholder="Employee ID"
-                        value={employee_id}
-                        onChange={(e) => setEmployeeId(e.target.value)}
-                        required
-                    />
-                    <input
-                        type="password"
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                    />
-                    <button type="submit">Login</button>
-                </form>
+        <div className="login-page">
+            {/* Header */}
+            <header className="header">
+                <h1 className="store-name">SmartMart</h1>
+                <p className="tagline">Smarter Automation for Seamless Retail!</p>
+            </header>
+
+            <div className="login-container">
+                {/* Left Side (Image) */}
+                <div className="login-image">
+                    {/* Image will be set in CSS */}
+                </div>
+
+                {/* Right Side (Login Box) */}
+                <div className="login-box">
+                    <h2>Employee Login</h2>
+                    {error && <p className="error-text">{error}</p>}
+                    <form onSubmit={handleLogin}>
+                        <input
+                            type="number"
+                            placeholder="Employee ID"
+                            value={employee_id}
+                            onChange={(e) => setEmployeeId(e.target.value)}
+                            required
+                        />
+                        <input
+                            type="password"
+                            placeholder="Password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                        />
+                        <button type="submit">Login</button>
+                    </form>
+                </div>
             </div>
+
+            {/* Footer */}
+            <footer className="footer">
+                <p>📍 Mission Street, Coimbatore | 📞 9442XXX456 | ✉ contactus@smartmart.com</p>
+                <p>© 2025 SmartMart. All Rights Reserved.</p>
+            </footer>
         </div>
     );
 };

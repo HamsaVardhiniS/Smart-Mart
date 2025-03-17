@@ -1,23 +1,16 @@
 const express = require("express");
-const {
-    getEmployees,
-    createEmployee,
-    deleteEmployee, // Ensure it's imported
-    getDepartments,
-    createDepartment,
-    deleteDepartment // Ensure it's imported
-} = require("../controllers/adminController");
+const adminController = require("../controllers/adminController");
 
 const router = express.Router();
 
 // Employee Routes
-router.get("/employees", getEmployees);
-router.post("/employees", createEmployee);
-router.delete("/employees/:employee_id", deleteEmployee); // Fix Delete Employee Route
+router.get("/employees", adminController.getEmployees);
+router.post("/employees", adminController.createEmployee);
+router.delete("/employees/:employee_id", adminController.deleteEmployee); // Ensure deleteEmployee exists
 
 // Department Routes
-router.get("/departments", getDepartments);
-router.post("/departments", createDepartment);
-router.delete("/departments/:department_id", deleteDepartment); // Fix Delete Department Route
+router.get("/departments", adminController.getDepartments);
+router.post("/departments", adminController.createDepartment);
+router.delete("/departments/:department_id", adminController.deleteDepartment); // Ensure deleteDepartment exists
 
 module.exports = router;

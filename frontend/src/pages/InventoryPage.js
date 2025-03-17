@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { Button, Table, Modal, Input, Select, message } from 'antd';
 
 const InventoryPage = () => {
     const [selectedSection, setSelectedSection] = useState("dashboard");
@@ -8,8 +9,8 @@ const InventoryPage = () => {
         <div className="inventory-container">
             <aside className="sidebar">
                 <h2>Inventory</h2>
-                <button onClick={() => setSelectedSection("dashboard")}>Dashboard</button>
-                <button onClick={() => setSelectedSection("updateProduct")}>Update Product</button>
+                <button onClick={() => setSelectedSection("dashboard")}>Stock view</button>
+                <button onClick={() => setSelectedSection("updateProduct")}>Manage Product</button>
                 <button onClick={() => setSelectedSection("manageSuppliers")}>Manage Suppliers</button>
                 <button onClick={() => setSelectedSection("manageOrders")}>Manage Orders</button>
             </aside>
@@ -32,16 +33,17 @@ const ProductDashboard = () => {
 
     useEffect(() => {
         fetchInventoryProducts();
-    }, [searchQuery]); // Runs when searchQuery changes
-    
+    },[]);
+       
+
     const fetchInventoryProducts = async () => {
         setLoading(true);
         try {
-            let url = "http://localhost:5000/inventory/products";
+            let url = "http://localhost:5000/api/inventory/products";
     
             // If searchQuery exists, modify the URL
             if (searchQuery.trim() !== "") {
-                url = `http://localhost:5000/inventory/products/search?query=${searchQuery}`;
+                url = `http://localhost:5000/api/inventory/products/search?query=${encodeURIComponent(searchQuery)}`;
             }
     
             const response = await axios.get(url);
@@ -55,9 +57,10 @@ const ProductDashboard = () => {
     };
     
 
+
     return (
         <div className="dashboard">
-            <h2>Product Inventory</h2>
+            <h2>Inventory</h2>
 
             {/* Search Bar */}
             <input
@@ -132,17 +135,19 @@ const ManageSuppliers = () => {
         gst_number: "",
         status: "Active",
     });
+     // Fetch suppliers when searchQuery changes
 
-    useEffect(() => {
+     useEffect(() => {
         fetchSuppliers();
-    }, [searchQuery]); // Fetch suppliers when searchQuery changes
+    },[]);
+
 
     const fetchSuppliers = async () => {
         setLoading(true);
         try {
             const url = searchQuery 
-                ? `http://localhost:5000/inventory/suppliers?search=${searchQuery}`
-                : `http://localhost:5000/inventory/suppliers`; // Fetch all suppliers if no search query
+                ? `http://localhost:5000/api/inventory/suppliers?search=${searchQuery}`
+                : `http://localhost:5000/api/inventory/suppliers`; // Fetch all suppliers if no search query
     
             const response = await axios.get(url);
             setSuppliers(response.data);
@@ -156,7 +161,7 @@ const ManageSuppliers = () => {
 
     const handleAddSupplier = async () => {
         try {
-            await axios.post("http://localhost:5000/inventory/suppliers", newSupplier);
+            await axios.post("http://localhost:5000/api/inventory/suppliers", newSupplier);
             setShowModal(false);
             fetchSuppliers(); // Refresh supplier list
             setNewSupplier({
@@ -249,52 +254,334 @@ const ManageSuppliers = () => {
     );
 };
 
-/* ✅ Manage Orders (Placeholder) */
+
 const ManageOrders = () => {
-    return (
-        <div className="manage-orders">
-            <h2>Manage Orders</h2>
-            <p>Order management functionality coming soon...</p>
-        </div>
-    );
-};
+    const [products, setProducts] = useState([]);
+    const [currentOrders, setCurrentOrders] = useState([]);
+    const [orderHistory, setHistoricalOrders] = useState([]);
+    const [visible, setVisible] = useState(false);
+    const [selectedProducts, setSelectedProducts] = useState([]);
+    const [supplierId, setSupplierId] = useState('');
+    const [processedBy] = useState('Admin');
+    const [trackOrderId, setTrackOrderId] = useState('');
+    const [orderStatus, setOrderStatus] = useState('');
 
-/* ✅ Update Product (Placeholder) */
-const UpdateProduct = () => {
-    const [product, setProduct] = useState({
-        product_id: "",
-        product_name: "",
-        brand_id: "",
-        category_id: "",
-        subcategory_id: "",
-        unit: "",
-        reorder_level: "",
-        stock_threshold_alert: "",
-        tax_percentage: ""
-    });
+    // ✅ Load Data on Component Mount
+    useEffect(() => {
+        fetchProducts();
+        fetchCurrentOrders();
+        fetchHistoricalOrders();
+    }, []);
 
-    const handleChange = (e) => {
-        setProduct({ ...product, [e.target.name]: e.target.value });
+    // ✅ Fetch Products
+    const fetchProducts = async () => {
+        try {
+            const res = await axios.get('/api/inventory/products');
+            setProducts(res.data);
+        } catch (error) {
+            console.error("Failed to fetch products", error);
+        }
     };
 
-    const handleUpdate = async () => {
+    // ✅ Fetch Current Orders
+    const fetchCurrentOrders = async () => {
         try {
-            await axios.put(`http://localhost:3000/api/products/${product.product_id}`, product);
-            alert("Product updated successfully!");
+            const res = await axios.get('/api/inventory/current-orders');
+            setCurrentOrders(res.data);
         } catch (error) {
-            console.error("Error updating product:", error);
+            console.error("Failed to fetch current orders", error);
+        }
+    };
+
+    // ✅ Fetch Order History
+    const fetchHistoricalOrders = async () => {
+        try {
+            const res = await axios.get('/api/inventory/historical-orders') ;
+            setHistoricalOrders(res.data);
+        } catch (error) {
+            console.error("Failed to fetch historical orders", error);
+        }
+    };
+
+    // ✅ Add Product to Order
+    const handleAddProduct = (product_id, quantity) => {
+        const product = products.find(p => p.product_id === product_id);
+        const isExist = selectedProducts.some(p => p.product_id === product_id);
+
+        if (!isExist) {
+            setSelectedProducts([...selectedProducts, {
+                product_id: product.product_id,
+                product_name: product.product_name,
+                unit_cost: product.unit_cost,
+                quantity: quantity
+            }]);
+        }
+    };
+
+    // ✅ Place Order
+    const handlePlaceOrder = async () => {
+        if (!supplierId || selectedProducts.length === 0) {
+            message.error('Supplier and products are required');
+            return;
+        }
+        try {
+            await axios.post('/api/inventory/supplier-orders', {
+                supplier_id: supplierId,
+                products: selectedProducts,
+                processed_by: processedBy
+            });
+            message.success('Order placed successfully');
+            setVisible(false);
+            fetchCurrentOrders();
+            setSelectedProducts([]);
+        } catch (error) {
+            message.error('Failed to place order');
+        }
+    };
+
+    // ✅ Track Order
+    const handleTrackOrder = async () => {
+        if (!trackOrderId) {
+            message.error('Please enter an Order ID');
+            return;
+        }
+        try {
+            const res = await axios.get(`/api/inventory/supplier-orders/${trackOrderId}/track`);
+            setOrderStatus(res.data.status);
+        } catch (error) {
+            message.error('Failed to track order');
+            setOrderStatus('Not Found');
+        }
+    };
+
+    // ✅ Update Order Status
+    const handleUpdateStatus = async (order_id, status) => {
+        try {
+            await axios.put(`/api/inventory/supplier-orders/${order_id}/status`, { status });
+            message.success('Order status updated');
+            fetchCurrentOrders();
+            fetchHistoricalOrders();
+        } catch (error) {
+            message.error('Failed to update status');
         }
     };
 
     return (
-        <div className="update-product">
-            <h2>Update Product</h2>
-            <input type="text" name="product_id" placeholder="Product ID" onChange={handleChange} />
-            <input type="text" name="product_name" placeholder="Product Name" onChange={handleChange} />
-            <button onClick={handleUpdate}>Update</button>
+        <div>
+            {/* ✅ Track Order Section */}
+            <h2>📍 Track Order</h2>
+            <Input
+                placeholder="Enter Order ID"
+                value={trackOrderId}
+                onChange={(e) => setTrackOrderId(e.target.value)}
+                style={{ width: '300px', marginRight: '10px' }}
+            />
+            <Button onClick={handleTrackOrder} type="primary">Track</Button>
+
+            {/* ✅ Show Order Status */}
+            {orderStatus && (
+                <div style={{ marginTop: '20px', padding: '10px', border: '1px solid #ccc', borderRadius: '5px', width: '300px' }}>
+                    <strong>Order ID:</strong> {trackOrderId} <br />
+                    <strong>Status:</strong>
+                    <span style={{ color: orderStatus === 'Completed' ? 'green' : orderStatus === 'Cancelled' ? 'red' : 'blue' }}>
+                        {orderStatus}
+                    </span>
+                </div>
+            )}
+
+            {/* ✅ Create Order Button */}
+            <Button type="primary" onClick={() => setVisible(true)} style={{ float: 'right', marginBottom: '20px' }}>
+                + Create Order
+            </Button>
+
+            {/* ✅ Current Orders Table */}
+            <h2>🟢 Current Orders</h2>
+            <Table 
+                dataSource={currentOrders} 
+                rowKey="order_id"
+                columns={[
+                    { title: 'Order ID', dataIndex: 'order_id' },
+                    { title: 'Supplier', dataIndex: 'supplier_name' },
+                    { title: 'Total Cost', dataIndex: 'total_cost' },
+                    { title: 'Status', dataIndex: 'status' },
+                    {
+                        title: 'Action',
+                        render: (_, record) => (
+                            <>
+                                <Button onClick={() => handleUpdateStatus(record.order_id, 'Completed')}>
+                                    ✅ Mark as Received
+                                </Button>
+                                <Button onClick={() => handleUpdateStatus(record.order_id, 'Cancelled')} danger>
+                                    ❌ Cancel
+                                </Button>
+                            </>
+                        )
+                    }
+                ]}
+            />
+
+            {/* ✅ Order History Table */}
+            <h2>📜 Order History</h2>
+            <Table dataSource={orderHistory} rowKey="order_id"
+                columns={[
+                    { title: 'Order ID', dataIndex: 'order_id' },
+                    { title: 'Supplier', dataIndex: 'supplier_name' },
+                    { title: 'Total Cost', dataIndex: 'total_cost' },
+                    { title: 'Status', dataIndex: 'status' },
+                    { title: 'Date Placed', dataIndex: 'order_date' }
+                ]}
+            />
+
+            {/* ✅ Create Order Modal */}
+            <Modal
+                visible={visible}
+                onCancel={() => setVisible(false)}
+                onOk={handlePlaceOrder}
+                title="Create New Order"
+            >
+                <h3>Supplier ID</h3>
+                <Input 
+                    placeholder="Supplier ID" 
+                    value={supplierId} 
+                    onChange={(e) => setSupplierId(e.target.value)} 
+                />
+
+                <h3>Select Products</h3>
+                <Select
+    style={{ width: '100%' }}
+    onChange={(product_id) => handleAddProduct(product_id, 1)}
+>
+    {products
+        .filter(p => p.product_id) // Ensure product_id is valid
+        .map(p => (
+            <Select.Option key={p.product_id} value={p.product_id}>
+                {p.product_name}
+            </Select.Option>
+        ))}
+</Select>
+
+                <h3>Selected Products</h3>
+                {selectedProducts.map(p => (
+                    <div key={p.product_id}>
+                        {p.product_name} - Qty: {p.quantity} - ${p.unit_cost}
+                    </div>
+                ))}
+
+                <Button onClick={handlePlaceOrder} type="primary">✅ Confirm Order</Button>
+            </Modal>
         </div>
     );
 };
 
+
+const UpdateProduct = () => {
+    const [products, setProducts] = useState([]);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [productDetails, setProductDetails] = useState({
+        product_name: '',
+        brand_id: '',
+        category_id: '',
+        subcategory_id: '',
+        reorder_level: ''
+    });
+
+    // Fetch products when page loads
+    useEffect(() => {
+        fetchProducts();
+    }, []);
+
+    // ✅ Fetch product list to populate dropdown
+    const fetchProducts = async () => {
+        try {
+            const res = await axios.get('/api/inventory/products');
+            if (res.data.length > 0) {
+                setProducts(res.data);
+                console.log('Fetched Products:', res.data);
+            } else {
+                message.info('No products available');
+            }
+        } catch (error) {
+            message.error('Failed to fetch products');
+        }
+    };
+
+    // ✅ Handle product selection and fetch details
+    const handleSelect = async (productId) => {
+        setProductDetails({
+            product_name: '',
+            brand_id: '',
+            category_id: '',
+            subcategory_id: '',
+            reorder_level: ''
+        });
+        
+        try {
+            const res = await axios.get(`/api/inventory/products/${productId}`);
+            setProductDetails(res.data);
+            setSelectedProduct(productId);
+            if (!res.data) {
+                message.warning('Product not found');
+                return;
+            }
+            
+        } catch (error) {
+            message.error('Failed to fetch product details');
+        }
+    };
+
+    // ✅ Handle input change
+    const handleChange = (e) => {
+        setProductDetails({ ...productDetails, [e.target.name]: e.target.value });
+    };
+
+    // ✅ Update product details
+    const handleUpdate = async () => {
+        try {
+            await axios.put(`/api/inventory/products/${selectedProduct}`, productDetails);
+            message.success('Product updated successfully!');
+            fetchProducts();  // Refresh the dropdown
+        } catch (error) {
+            message.error('Failed to update product');
+        }
+    };
+
+    return (
+        <div style={{ padding: '20px' }}>
+            <h2>Update Product</h2>
+
+            {/* ✅ Product Selection Dropdown */}
+            <Select
+                showSearch
+                placeholder="Search or select product"
+                optionFilterProp="children"
+                onChange={handleSelect}
+                style={{ width: 300, marginBottom: '20px' }}
+            >
+               {products
+  .filter(product => product.product_id) // Prevent null IDs
+  .map(product => (
+    <Select.Option key={product.product_id} value={product.product_id}>
+        {product.product_name}
+    </Select.Option>
+))}
+
+            </Select>
+
+            {/* ✅ Product Details Form */}
+            {selectedProduct && (
+                <div style={{ marginTop: '20px' }}>
+                    <Input name="product_name" value={productDetails.product_name} onChange={handleChange} placeholder="Product Name" />
+                    <Input name="brand_id" value={productDetails.brand_id} onChange={handleChange} placeholder="Brand ID" />
+                    <Input name="category_id" value={productDetails.category_id} onChange={handleChange} placeholder="Category ID" />
+                    <Input name="subcategory_id" value={productDetails.subcategory_id} onChange={handleChange} placeholder="Subcategory ID" />
+                    <Input name="reorder_level" value={productDetails.reorder_level} onChange={handleChange} placeholder="Reorder Level" />
+                    <Button type="primary" onClick={handleUpdate} style={{ marginTop: '10px' }}>
+                        Update Product
+                    </Button>
+                </div>
+            )}
+        </div>
+    );
+};
 
 export default InventoryPage;

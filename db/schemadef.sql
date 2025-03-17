@@ -36,7 +36,7 @@ CREATE TABLE employees (
     gender ENUM('Male', 'Female', 'Other'),
     emergency_contact VARCHAR(20),
     hire_date DATE,                                                         
-    shift ENUM('Morning', 'Evening', 'Night'),
+    preferred_shifts ENUM('Morning', 'Evening', 'Night'),
     status ENUM('Active', 'Inactive') DEFAULT 'Active',
     password_hash VARCHAR(255),
     
@@ -48,6 +48,58 @@ CREATE TABLE employees (
     salary_mode ENUM('Bank Transfer', 'Cheque', 'UPI', 'Cash') DEFAULT 'Bank Transfer',
     FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL
 );
+
+
+
+-- ATTENDANCE TABLE (Auto-tracks check-in/out and calculates hours worked)
+CREATE TABLE attendance (
+    attendance_id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id INT NOT NULL,
+    date DATE NOT NULL,
+    check_in_time TIME,
+    check_out_time TIME,
+    total_hours DECIMAL(5,2) GENERATED ALWAYS AS (TIMESTAMPDIFF(MINUTE, check_in_time, check_out_time) / 60.0) STORED,
+    status ENUM('Present', 'Absent', 'Leave', 'Half-day') NOT NULL DEFAULT 'Absent',
+    leave_type ENUM('Paid Leave', 'Unpaid Leave', 'Sick Leave', 'Casual Leave', 'Maternity Leave', 'Other') DEFAULT NULL,
+
+    FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE
+);
+
+-- PAYROLL TABLE (Auto-calculates salary based on hours worked, leaves, and bonuses)
+CREATE TABLE payroll (
+    payroll_id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id INT NOT NULL,
+    month YEAR NOT NULL,
+    base_salary DECIMAL(10,2) NOT NULL,
+    total_hours_worked DECIMAL(6,2) NOT NULL DEFAULT 0,
+    hourly_rate DECIMAL(10,2) GENERATED ALWAYS AS (base_salary / 160) STORED,  -- Assuming 160 work hours/month
+    leave_deduction DECIMAL(10,2) NOT NULL DEFAULT 0,  -- Deduct for unpaid leaves
+    bonus DECIMAL(10,2) NOT NULL DEFAULT 0,  -- Performance-based incentives
+    net_salary DECIMAL(10,2) GENERATED ALWAYS AS (base_salary + bonus - leave_deduction) STORED,
+
+    FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE
+);
+
+-- LEAVE REQUESTS TABLE (Employees request leave, HR approves/rejects)
+CREATE TABLE leave_requests (
+    leave_id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id INT NOT NULL,
+    leave_date DATE NOT NULL,
+    leave_type ENUM('Paid Leave', 'Unpaid Leave', 'Sick Leave', 'Casual Leave', 'Maternity Leave', 'Other') NOT NULL,
+    status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
+
+    FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE
+);
+
+CREATE TABLE shifts (
+    shift_id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id INT NOT NULL,
+    shift_date DATE NOT NULL,
+    shift_type ENUM('Morning', 'Evening', 'Night') NOT NULL,
+    
+    FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE
+);
+
 
 CREATE TABLE departments (
     department_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -90,7 +142,6 @@ CREATE TABLE products (
     FOREIGN KEY (category_id) REFERENCES product_categories(category_id) ON DELETE CASCADE,
     FOREIGN KEY (subcategory_id) REFERENCES product_subcategories(subcategory_id) ON DELETE CASCADE
 );
-
 
 CREATE TABLE inventory_batches (
     batch_id INT AUTO_INCREMENT PRIMARY KEY,

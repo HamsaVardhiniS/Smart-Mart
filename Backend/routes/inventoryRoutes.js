@@ -2,20 +2,39 @@ const express = require("express");
 const router = express.Router();
 const inventoryController = require("../controllers/inventoryController");
 
-// Routes for products
+// ============================
+// Product Management Routes
+// ============================
+router.post("/products", inventoryController.addProduct);
 router.get("/products", inventoryController.getAllProducts);
-router.get("/products/search", inventoryController.searchProducts);
+router.get("/products/:product_id", inventoryController.getProductById);
 router.put("/products/:product_id", inventoryController.updateProduct);
+router.get("/products/search", inventoryController.searchProductByName);
 
-// Routes for supplier orders
-router.get("/supplier-orders", inventoryController.getSupplierOrders);
-router.get("/suppliers", inventoryController.getAllSuppliers); // Fetch all suppliers (also supports search)
-router.post("/suppliers", inventoryController.createSupplier); // Create a supplier
-router.put("/suppliers/:supplier_id", inventoryController.updateSupplier); 
-// Routes for inventory batches
-router.get("/inventory-batches", inventoryController.getInventoryBatches);
+// ============================
+// Supplier Management Routes
+// ============================
+router.get("/suppliers", inventoryController.getAllSuppliers);
+router.post("/suppliers", inventoryController.createSupplier);
+router.put("/suppliers/:supplier_id", inventoryController.updateSupplier);
+router.get("/suppliers/:supplier_id/orders", inventoryController.getAllOrdersBySupplier);
 
-// Routes for sales transactions
-router.get("/sales-transactions", inventoryController.getSalesTransactions);
+// ============================
+// Supplier Order Management Routes
+// ============================
+router.post("/supplier-orders", inventoryController.placeSupplierOrder);
+router.put("/supplier-orders/:invoice_number/status", inventoryController.updateOrderStatus);
+router.delete("/supplier-orders/:invoice_number", inventoryController.cancelSupplierOrder);
+router.get("/supplier-orders/:invoice_number/track", inventoryController.trackSupplierOrder);
+router.get("/current-orders", inventoryController.getCurrentOrders);
+router.get("/historical-orders", inventoryController.getHistoricalOrders);
+router.get("/search-orders", inventoryController.searchOrders);
+router.get('/supplier-orders/items/:invoice_number', inventoryController.getItemsFromInvoice);
 
-module.exports = router;
+
+// ============================
+// Stock Management Routes
+// ============================
+router.get("/stock-alerts", inventoryController.getStockAlertProducts);
+
+module.exports = router; // Ensure this is exporting `router`

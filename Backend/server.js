@@ -1,63 +1,40 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const app = express();
+const cookieParser = require("cookie-parser");
 const db = require("./config/db");
 
-// Import route files
-const authRoutes = require("./routes/authRoutes");
-const inventoryRoutes = require("./routes/inventoryRoutes");
-const cashierRoutes = require("./routes/cashierRoutes");
-const hrRoutes = require("./routes/hrRoutes");
-const businessHeadRoutes = require("./routes/businessHeadRoutes");
-const adminRoutes = require("./routes/adminRoutes"); // ✅ Admin Routes
-const orderRoutes = require("./routes/orderRoutes");
-const supplierRoutes = require("./routes/supplierRoutes");
-const errorHandler = require("./middleware/errorMiddleware");
+const app = express();
+app.use(cookieParser()); // ✅ Enables cookie parsing
 
 // Middleware setup
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(
     cors({
         origin: "http://localhost:3000",
-        credentials: true,
+        credentials: true, // ✅ Allows cookies from frontend
         allowedHeaders: ["Content-Type", "Authorization"],
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     })
 );
 
-// Register routes
-app.use("/auth", authRoutes);
-app.use("/inventory", inventoryRoutes);
-app.use("/cashier", cashierRoutes);
-app.use("/hr", hrRoutes);
-app.use("/business-head", businessHeadRoutes);
-app.use("/api/admin", adminRoutes); // ✅ FIXED - Added "/api" prefix
-app.use("/order", orderRoutes);
-app.use("/supplier", supplierRoutes);
+// Import and register routes
+app.use("/auth", require("./routes/authRoutes"));
+app.use("/api/inventory", require("./routes/inventoryRoutes"));
+app.use("/api/cashier", require("./routes/cashierRoutes"));
+app.use("/api/hr", require("./routes/hrRoutes"));
+app.use("/api/business-head", require("./routes/businessHeadRoutes"));
+app.use("/api/admin", require("./routes/adminRoutes"));
 
-// Admin functionality - Database Health Check
-app.get("/api/admin/db-health", async (req, res) => { // ✅ FIXED - Now part of "/api/admin"
-    try {
-        await db.query("SELECT 1");
-        res.json({ status: "Database connected successfully" });
-    } catch (error) {
-        res.status(500).json({ error: "Database connection failed", details: error.message });
-    }
+// ✅ Root API Check
+app.get("/", (req, res) => {
+    res.json({ message: "SmartMart Backend is running! 🚀" });
 });
 
-// Admin functionality - Dashboard Stats
-app.get("/api/admin/dashboard", async (req, res) => { // ✅ FIXED - Now part of "/api/admin"
-    try {
-        const [rows] = await db.query("SELECT COUNT(*) AS totalEmployees FROM employees");
-        res.json(rows[0]);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+// Global Error Handling Middleware
+app.use(require("./middleware/errorMiddleware"));
 
-// Error handling middleware
-app.use(errorHandler);
-
+// Start the Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

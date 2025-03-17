@@ -94,11 +94,14 @@ exports.logout = async (req, res) => {
 
 // ✅ Verify Authentication Middleware
 exports.verifyAuth = async (req, res) => {
-    const token = req.cookies.auth_token;
-    
-    if (!token) {
-        return res.status(401).json({ error: "Unauthorized" });
+    console.log("Cookies:", req.cookies); // ✅ Debugging
+    console.log("Headers:", req.headers); // ✅ Check if frontend sends cookies
+
+    if (!req.cookies || !req.cookies.auth_token) {
+        return res.status(401).json({ error: "Unauthorized: No auth token" });
     }
+
+    const token = req.cookies.auth_token;
 
     try {
         const decoded = jwt.verify(token, process.env.SECRET_KEY || "your_secret_key");

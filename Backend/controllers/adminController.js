@@ -20,23 +20,45 @@ exports.createDepartment = async (req, res) => {
     }
 };
 
-
-// Get All Departments
+// Get All Departments (with optional search by name)
 exports.getDepartments = async (req, res) => {
     try {
-        const [departments] = await db.query("SELECT * FROM departments"); // ✅ Ensure query is correct
+        const { search } = req.query;
+        let query = "SELECT * FROM departments";
+        let values = [];
+
+        if (search) {
+            query += " WHERE department_name LIKE ?";
+            values.push(`%${search}%`);
+        }
+
+        const [departments] = await db.query(query, values);
         res.json(departments);
+
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 };
 
+// Delete Department
+exports.deleteDepartment = async (req, res) => {
+    const { department_id } = req.params;
+    try {
+        const [result] = await db.query("DELETE FROM departments WHERE department_id = ?", [department_id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: "Department not found" });
+        }
+        res.json({ message: "Department deleted successfully" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
 
-
+// Create Employee
 exports.createEmployee = async (req, res) => {
     const {
         first_name, last_name, role, department_id, phone, email, address, dob, gender,
-        emergency_contact, hire_date, shift, status, password, bank_account_number,
+        emergency_contact, hire_date, preferred_shifts, status, password, bank_account_number,
         bank_name, ifsc_code, account_holder_name, salary, salary_mode
     } = req.body;
 
@@ -54,12 +76,11 @@ exports.createEmployee = async (req, res) => {
         await db.query(
             `INSERT INTO employees 
             (first_name, last_name, role, department_id, phone, email, address, dob, gender, 
-            emergency_contact, hire_date, shift, status, password_hash, 
+            emergency_contact, hire_date, preferred_shifts, status, password_hash, 
             bank_account_number, bank_name, ifsc_code, account_holder_name, salary, salary_mode) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-
             [first_name, last_name, role, department_id, phone, email, address, dob, gender,
-            emergency_contact, hire_date, shift, status, hashedPassword,
+            emergency_contact, hire_date, preferred_shifts, status, hashedPassword,
             bank_account_number, bank_name, ifsc_code, account_holder_name, salary, salary_mode]
         );
 
@@ -70,20 +91,25 @@ exports.createEmployee = async (req, res) => {
     }
 };
 
-// Get All Employees
+// Get All Employees (with optional search by name or role)
 exports.getEmployees = async (req, res) => {
     try {
-        // Fetch all employees
-        const [employees] = await db.query("SELECT * FROM employees");
+        const { search } = req.query;
+        let query = "SELECT * FROM employees";
+        let values = [];
 
-        // Return all employees
+        if (search) {
+            query += " WHERE first_name LIKE ? OR last_name LIKE ? OR role LIKE ?";
+            values.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
+
+        const [employees] = await db.query(query, values);
         res.json(employees);
 
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 };
-
 
 // Delete Employee
 exports.deleteEmployee = async (req, res) => {
@@ -94,20 +120,6 @@ exports.deleteEmployee = async (req, res) => {
             return res.status(404).json({ error: "Employee not found" });
         }
         res.json({ message: "Employee deleted successfully" });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-};
-
-// Delete Department
-exports.deleteDepartment = async (req, res) => {
-    const { department_id } = req.params;
-    try {
-        const [result] = await db.query("DELETE FROM departments WHERE department_id = ?", [department_id]);
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: "Department not found" });
-        }
-        res.json({ message: "Department deleted successfully" });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

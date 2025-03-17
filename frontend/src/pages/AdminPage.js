@@ -1,232 +1,238 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Button, Table, Modal, Input, Select, message, DatePicker } from "antd";
-
-axios.defaults.baseURL = "http://localhost:5000/api/admin"; // Correct API base URL
 
 const AdminPage = () => {
-  const [departments, setDepartments] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [deptModalVisible, setDeptModalVisible] = useState(false);
-  const [empModalVisible, setEmpModalVisible] = useState(false);
-  
-  const [newDept, setNewDept] = useState({ department_name: "", manager_id: "" });
-  const [newEmployee, setNewEmployee] = useState({
-    first_name: "", last_name: "", role: "Cashier", department_id: "", phone: "",
-    email: "", address: "", dob: "", gender: "Male", emergency_contact: "",
-    hire_date: "", shift: "Morning", status: "Active", password: "",
-    bank_account_number: "", bank_name: "", ifsc_code: "", account_holder_name: "",
-    salary: "", salary_mode: "Bank Transfer"
-  });
-
-  useEffect(() => {
-    fetchDepartments();
-    fetchEmployees();
-  }, []);
-
-  const fetchDepartments = async () => {
-    try {
-      const res = await axios.get("/departments");
-      setDepartments(res.data);
-    } catch (error) {
-      message.error("Failed to fetch departments");
-    }
-  };
-
-  const fetchEmployees = async () => {
-    try {
-      const res = await axios.get("/employees");
-      setEmployees(res.data);
-    } catch (error) {
-      message.error("Failed to fetch employees");
-    }
-  };
-
-  const createDepartment = async () => {
-    if (!newDept.department_name) return message.warning("Department name is required");
-    try {
-      await axios.post("/departments", newDept);
-      message.success("Department created successfully");
-      setDeptModalVisible(false);
-      fetchDepartments();
-    } catch (error) {
-      message.error("Failed to create department");
-    }
-  };
-
-  const createEmployee = async () => {
-    console.log("🔍 Creating Employee Data:", newEmployee); // Debugging log before API call
-  
-    if (!newEmployee.first_name || !newEmployee.email || !newEmployee.password)
-      return message.warning("First name, email, and password are required");
-  
-    try {
-      const response = await axios.post("/employees", newEmployee);
-      console.log("✅ Employee Created Successfully:", response.data); // Log response data
-  
-      message.success("Employee added successfully");
-      setEmpModalVisible(false);
-      fetchEmployees(); // Refresh list
-    } catch (error) {
-      console.error("❌ Failed to create employee:", error.response?.data || error.message);
-      message.error("Failed to add employee");
-    }
-  };
-  
-  const deleteDepartment = async (department_id) => {
-    console.log("Deleting department with ID:", department_id); // Debug log
-  
-    Modal.confirm({
-      title: "Confirm Deletion",
-      content: "Are you sure you want to delete this department?",
-      onOk: async () => {
-        try {
-          const response = await axios.delete(`/departments/${department_id}`);
-          console.log("Delete response:", response); // Debug log
-          message.success("Department deleted successfully");
-          fetchDepartments();
-        } catch (error) {
-          console.error("Delete failed:", error.response?.data || error.message); // Debug log
-          message.error("Failed to delete department");
-        }
-      },
+    const [departments, setDepartments] = useState([]);
+    const [employees, setEmployees] = useState([]);
+    const [searchDept, setSearchDept] = useState("");
+    const [searchEmp, setSearchEmp] = useState("");
+    const [showDeptModal, setShowDeptModal] = useState(false);
+    const [showEmpModal, setShowEmpModal] = useState(false);
+    const [newDepartment, setNewDepartment] = useState({ department_name: "", manager_id: "" });
+    const [newEmployee, setNewEmployee] = useState({
+        first_name: "", last_name: "", role: "Cashier", department_id: "", phone: "", email: "",
+        address: "", dob: "", gender: "Male", emergency_contact: "", hire_date: "",
+        status: "Active", password_hash: "", bank_account_number: "", bank_name: "", ifsc_code: "",
+        account_holder_name: "", salary: "", salary_mode: "Bank Transfer", preferred_shifts: "Morning", allowed_leaves: 12
     });
-  };
 
-  const deleteEmployee = async (employee_id) => {
-    console.log("Deleting employee with ID:", employee_id); // Debug log
-  
-    Modal.confirm({
-      title: "Confirm Deletion",
-      content: "Are you sure you want to delete this employee?",
-      onOk: async () => {
-        try {
-          const response = await axios.delete(`/employees/${employee_id}`);
-          console.log("Delete response:", response); // Debug log
-          message.success("Employee deleted successfully");
-          fetchEmployees();
-        } catch (error) {
-          console.error("Delete failed:", error.response?.data || error.message); // Debug log
-          message.error("Failed to delete employee");
-        }
-      },
-    });
-  };  
+    useEffect(() => {
+        fetchDepartments();
+        fetchEmployees();
+    }, []);
 
-  return (
-    <div>
-      <h2>Admin Dashboard</h2>
+    const fetchDepartments = async () => {
+        const res = await axios.get("http://localhost:5000/api/admin/departments");
+        setDepartments(res.data);
+    };
 
-      {/* 🔹 Departments Section */}
-      <h3>Departments</h3>
-      <Button onClick={() => setDeptModalVisible(true)}>Add Department</Button>
-      <Table
-        rowKey="department_id"
-        dataSource={departments}
-        columns={[
-          { title: "Department ID", dataIndex: "department_id" },
-          { title: "Department Name", dataIndex: "department_name" },
-          {
-            title: "Actions",
-            render: (text, record) => (
-<Button 
-  onClick={() => {
-    console.log("Clicked Delete for Department ID:", record.department_id); // Debug log
-    deleteDepartment(record.department_id);
-  }} 
-  danger
->
-  Delete
-</Button>
-             ),
-          },
-        ]}
-      />
+    const fetchEmployees = async () => {
+        const res = await axios.get("http://localhost:5000/api/admin/employees");
+        setEmployees(res.data);
+    };
 
-      {/* 🔹 Employees Section */}
-      <h3>Employees</h3>
-      <Button onClick={() => setEmpModalVisible(true)}>Add Employee</Button>
-      <Table
-        rowKey="employee_id"
-        dataSource={employees}
-        columns={[
-          { title: "Employee ID", dataIndex: "employee_id" },
-          { title: "First Name", dataIndex: "first_name" },
-          { title: "Last Name", dataIndex: "last_name" },
-          { title: "Role", dataIndex: "role" },
-          { title: "Department", dataIndex: "department_id" },
-          { title: "Phone", dataIndex: "phone" },
-          { title: "Email", dataIndex: "email" },
-          { title: "Status", dataIndex: "status" },
-          {
-            title: "Actions",
-            render: (text, record) => (
-<Button 
-  onClick={() => {
-    console.log("Clicked Delete for Employee ID:", record.employee_id); // Debug log
-    deleteEmployee(record.employee_id);
-  }} 
-  danger
->
-  Delete
-</Button>            ),
-          },
-        ]}
-      />
-  
-      <Modal title="Add Department" open={deptModalVisible} onCancel={() => setDeptModalVisible(false)} onOk={createDepartment}>
-        <Input placeholder="Department Name" value={newDept.department_name} onChange={(e) => setNewDept({ ...newDept, department_name: e.target.value })} />
-        <Input placeholder="Manager ID (Optional)" value={newDept.manager_id} onChange={(e) => setNewDept({ ...newDept, manager_id: e.target.value })} />
-      </Modal>
-  
-      <Modal title="Add Employee" open={empModalVisible} onCancel={() => setEmpModalVisible(false)} onOk={createEmployee}>
-        <Input placeholder="First Name" value={newEmployee.first_name} onChange={(e) => setNewEmployee({ ...newEmployee, first_name: e.target.value })} />
-        <Input placeholder="Last Name" value={newEmployee.last_name} onChange={(e) => setNewEmployee({ ...newEmployee, last_name: e.target.value })} />
-        <Select value={newEmployee.role} onChange={(value) => setNewEmployee({ ...newEmployee, role: value })}>
-          <Select.Option value="Cashier">Cashier</Select.Option>
-          <Select.Option value="Inventory Manager">Inventory Manager</Select.Option>
-          <Select.Option value="Admin">Admin</Select.Option>
-          <Select.Option value="HR Manager">HR Manager</Select.Option>
-          <Select.Option value="Business Head">Business Head</Select.Option>
-        </Select>
-        <Select value={newEmployee.department_id} onChange={(value) => setNewEmployee({ ...newEmployee, department_id: value })}>
-          {departments.map((dept) => (
-            <Select.Option key={dept.department_id} value={dept.department_id}>
-              {dept.department_name}
-            </Select.Option>
-          ))}
-        </Select>
-        <Input placeholder="Email" value={newEmployee.email} onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })} />
-        <Input.Password placeholder="Password" value={newEmployee.password} onChange={(e) => setNewEmployee({ ...newEmployee, password: e.target.value })} />
-        <Input placeholder="Phone" value={newEmployee.phone} onChange={(e) => setNewEmployee({ ...newEmployee, phone: e.target.value })} />
-        <Input placeholder="Address" value={newEmployee.address} onChange={(e) => setNewEmployee({ ...newEmployee, address: e.target.value })} />
-        <DatePicker onChange={(date, dateString) => setNewEmployee({ ...newEmployee, dob: dateString })} />
-        <Select value={newEmployee.gender} onChange={(value) => setNewEmployee({ ...newEmployee, gender: value })}>
-          <Select.Option value="Male">Male</Select.Option>
-          <Select.Option value="Female">Female</Select.Option>
-        </Select>
-        <Input placeholder="Emergency Contact" value={newEmployee.emergency_contact} onChange={(e) => setNewEmployee({ ...newEmployee, emergency_contact: e.target.value })} />
-        <DatePicker onChange={(date, dateString) => setNewEmployee({ ...newEmployee, hire_date: dateString })} />
-        <Select value={newEmployee.shift} onChange={(value) => setNewEmployee({ ...newEmployee, shift: value })}>
-          <Select.Option value="Morning">Morning</Select.Option>
-          <Select.Option value="Evening">Evening</Select.Option>
-        </Select>
-        <Select value={newEmployee.status} onChange={(value) => setNewEmployee({ ...newEmployee, status: value })}>
-          <Select.Option value="Active">Active</Select.Option>
-          <Select.Option value="Inactive">Inactive</Select.Option>
-        </Select>
-        <Input placeholder="Bank Account Number" value={newEmployee.bank_account_number} onChange={(e) => setNewEmployee({ ...newEmployee, bank_account_number: e.target.value })} />
-        <Input placeholder="Bank Name" value={newEmployee.bank_name} onChange={(e) => setNewEmployee({ ...newEmployee, bank_name: e.target.value })} />
-        <Input placeholder="IFSC Code" value={newEmployee.ifsc_code} onChange={(e) => setNewEmployee({ ...newEmployee, ifsc_code: e.target.value })} />
-        <Input placeholder="Account Holder Name" value={newEmployee.account_holder_name} onChange={(e) => setNewEmployee({ ...newEmployee, account_holder_name: e.target.value })} />
-        <Input placeholder="Salary" value={newEmployee.salary} onChange={(e) => setNewEmployee({ ...newEmployee, salary: e.target.value })} />
-        <Select value={newEmployee.salary_mode} onChange={(value) => setNewEmployee({ ...newEmployee, salary_mode: value })}>
-          <Select.Option value="Bank Transfer">Bank Transfer</Select.Option>
-          <Select.Option value="Cash">Cash</Select.Option>
-        </Select>
-      </Modal>
+    const addDepartment = async () => {
+        await axios.post("http://localhost:5000/api/admin/departments", newDepartment);
+        setShowDeptModal(false);
+        fetchDepartments();
+    };
+
+    const addEmployee = async () => {
+        await axios.post("http://localhost:5000/api/admin/employees", newEmployee);
+        setShowEmpModal(false);
+        fetchEmployees();
+    };
+
+    const deleteDepartment = async (id) => {
+        await axios.delete(`http://localhost:5000/api/admin/departments/${id}`);
+        fetchDepartments();
+    };
+
+    const deleteEmployee = async (id) => {
+        await axios.delete(`http://localhost:5000/api/admin/employees/${id}`);
+        fetchEmployees();
+    };
+
+    return (
+        <div className="flex h-screen">
+            <div className="w-1/4 bg-blue-900 text-white p-5">
+                <h2 className="text-xl font-bold">Admin Panel</h2>
+                <ul className="mt-4">
+                    <li className="p-2 cursor-pointer">Departments</li>
+                    <li className="p-2 cursor-pointer">Employees</li>
+                </ul>
+            </div>
+
+            <div className="w-3/4 p-5">
+                <h2 className="text-2xl font-bold">Manage Departments</h2>
+                <input type="text" placeholder="Search" className="border p-2" 
+                    onChange={(e) => setSearchDept(e.target.value.toLowerCase())} />
+                <button className="bg-blue-500 text-white px-4 py-2 ml-2" onClick={() => setShowDeptModal(true)}>+ Add Department</button>
+                <table className="w-full border mt-4">
+                    <thead>
+                        <tr className="bg-gray-200">
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Manager ID</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {departments.filter(d => d.department_name.toLowerCase().includes(searchDept) || d.department_id.toString().includes(searchDept))
+                            .map((dept) => (
+                                <tr key={dept.department_id} className="border">
+                                    <td>{dept.department_id}</td>
+                                    <td>{dept.department_name}</td>
+                                    <td>{dept.manager_id}</td>
+                                    <td><button onClick={() => deleteDepartment(dept.department_id)}>🗑️</button></td>
+                                </tr>
+                            ))}
+                    </tbody>
+                </table>
+
+                <h2 className="text-2xl font-bold mt-10">Manage Employees</h2>
+                <input type="text" placeholder="Search" className="border p-2" 
+                    onChange={(e) => setSearchEmp(e.target.value.toLowerCase())} />
+                <button className="bg-blue-500 text-white px-4 py-2 ml-2" onClick={() => setShowEmpModal(true)}>+ Add Employee</button>
+                <table className="w-full border mt-4">
+                    <thead>
+                        <tr className="bg-gray-200">
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Department</th>
+                            <th>Role</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {employees.filter(e => e.first_name.toLowerCase().includes(searchEmp) || e.last_name.toLowerCase().includes(searchEmp) || e.role.toLowerCase().includes(searchEmp) || e.department_id.toString().includes(searchEmp))
+                            .map((emp) => (
+                                <tr key={emp.employee_id} className="border">
+                                    <td>{emp.employee_id}</td>
+                                    <td>{emp.first_name} {emp.last_name}</td>
+                                    <td>{emp.department_id}</td>
+                                    <td>{emp.role}</td>
+                                    <td><button onClick={() => deleteEmployee(emp.employee_id)}>🗑️</button></td>
+                                </tr>
+                            ))}
+                    </tbody>
+                </table>
+
+                {showDeptModal && <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="bg-white p-5 rounded-lg">
+                        <h2 className="text-lg font-bold">Add Department</h2>
+                        <input type="text" placeholder="Name" className="border p-2" 
+                            onChange={(e) => setNewDepartment({ ...newDepartment, department_name: e.target.value })} />
+                        <button className="bg-green-500 text-white px-4 py-2 mt-2" onClick={addDepartment}>Save</button>
+                    </div>
+                </div>}
+
+                {showEmpModal && (
+  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="bg-white p-5 rounded-lg w-1/3">
+      <h2 className="text-lg font-bold">Add Employee</h2>
+
+      <input type="text" placeholder="First Name" className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, first_name: e.target.value })} />
+
+      <input type="text" placeholder="Last Name" className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, last_name: e.target.value })} />
+
+      <input type="text" placeholder="Email" className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })} />
+
+      <input type="text" placeholder="Phone Number" className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, phone: e.target.value })} />
+
+      <input type="date" className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, dob: e.target.value })} />
+
+      <input type="date" className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, hire_date: e.target.value })} />
+
+      <input type="text" placeholder="Address" className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, address: e.target.value })} />
+
+      <input type="text" placeholder="Emergency Contact" className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, emergency_contact: e.target.value })} />
+
+      <input type="text" placeholder="Bank Account Holder Name" className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, account_holder_name: e.target.value })} />
+
+      <input type="text" placeholder="Bank Account Number" className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, bank_account_number: e.target.value })} />
+
+      <input type="text" placeholder="Bank Name" className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, bank_name: e.target.value })} />
+
+      <input type="text" placeholder="IFSC Code" className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, ifsc_code: e.target.value })} />
+
+      <select className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, role: e.target.value })}>
+        <option value="">Select Role</option>
+        <option value="Cashier">Cashier</option>
+        <option value="Inventory Manager">Inventory Manager</option>
+        <option value="Admin">Admin</option>
+        <option value="HR Manager">HR Manager</option>
+        <option value="Business Head">Business Head</option>
+      </select>
+
+      <select className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, department_id: e.target.value })}>
+        <option value="">Select Department</option>
+        {departments.map((dept) => (
+          <option key={dept.department_id} value={dept.department_id}>
+            {dept.department_name}
+          </option>
+        ))}
+      </select>
+
+      <select className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, gender: e.target.value })}>
+        <option value="">Select Gender</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+        <option value="Other">Other</option>
+      </select>
+
+      <select className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, preferred_shifts: e.target.value })}>
+        <option value="Morning">Morning</option>
+        <option value="Evening">Evening</option>
+        <option value="Night">Night</option>
+      </select>
+
+      <input type="number" placeholder="Salary" className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, salary: e.target.value })} />
+
+      <select className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, salary_mode: e.target.value })}>
+        <option value="Bank Transfer">Bank Transfer</option>
+        <option value="Cheque">Cheque</option>
+        <option value="UPI">UPI</option>
+        <option value="Cash">Cash</option>
+      </select>
+
+      <select className="border p-2 w-full mt-2"
+        onChange={(e) => setNewEmployee({ ...newEmployee, status: e.target.value })}>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+
+      <button className="bg-green-500 text-white px-4 py-2 mt-4 w-full" onClick={addEmployee}>
+        Save
+      </button>
+      <button className="bg-red-500 text-white px-4 py-2 mt-2 w-full" onClick={() => setShowEmpModal(false)}>
+        Cancel
+      </button>
     </div>
-  );
-};  
+  </div>
+)}
+
+            </div>
+        </div>
+    );
+};
 
 export default AdminPage;
